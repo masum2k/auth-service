@@ -8,6 +8,7 @@ import com.example.auth_service.model.AppUser;
 import com.example.auth_service.model.RefreshToken;
 import com.example.auth_service.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -15,6 +16,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthService {
@@ -29,12 +31,17 @@ public class AuthService {
     @Transactional
     public AuthResponse register(RegisterRequest request) {
         if (userRepository.existsByEmail(request.email())) {
+            log.warn("REGISTER: Email {} zaten var.", request.email());
             throw new IllegalArgumentException("Email already in use");
         }
 
         AppUser user = new AppUser();
         user.setEmail(request.email());
-        user.setPassword(passwordEncoder.encode(request.password()));
+
+        String encodedPassword = passwordEncoder.encode(request.password());
+        log.info("REGISTER: '{}' için şifre hash'lendi: {}", request.email(), encodedPassword);
+
+        user.setPassword(encodedPassword);
         user.setRole("ROLE_USER");
         userRepository.save(user);
 
@@ -48,17 +55,28 @@ public class AuthService {
 
         RefreshToken refreshToken = refreshTokenService.createRefreshToken(user.getEmail());
 
+        log.info("REGISTER: {} için kayıt BAŞARILI. Token üretildi.", request.email());
+
         return new AuthResponse(accessToken, refreshToken.getToken());
     }
 
     @Transactional
     public AuthResponse login(LoginRequest request) {
-        authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(
-                        request.email(),
-                        request.password()
-                )
-        );
+        log.info("LOGIN: {} için giriş denemesi.", request.email());
+
+        try {
+            authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(
+                            request.email(),
+                            request.password()
+                    )
+            );
+        } catch (Exception e) {
+            log.error("LOGIN: {} için kimlik doğrulama BAŞARISIZ: {}", request.email(), e.getMessage());
+            throw e;
+        }
+
+        log.info("LOGIN: {} için kimlik doğrulama BAŞARILI.", request.email());
 
         var user = userRepository.findByEmail(request.email())
                 .orElseThrow(() -> new IllegalArgumentException("Invalid email or password"));

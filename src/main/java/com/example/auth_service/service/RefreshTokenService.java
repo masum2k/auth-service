@@ -5,6 +5,7 @@ import com.example.auth_service.repository.RefreshTokenRepository;
 import com.example.auth_service.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional; // <-- BU IMPORTU EKLE
 
 import java.time.Instant;
 import java.util.Optional;
@@ -19,16 +20,24 @@ public class RefreshTokenService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final UserRepository userRepository;
 
+    @Transactional
     public RefreshToken createRefreshToken(String email) {
         var user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
 
-        refreshTokenRepository.deleteByUser(user);
+        Optional<RefreshToken> existingTokenOpt = refreshTokenRepository.findByUser(user);
 
-        RefreshToken refreshToken = new RefreshToken();
-        refreshToken.setUser(user);
-        refreshToken.setToken(UUID.randomUUID().toString());
-        refreshToken.setExpiryDate(Instant.now().plusMillis(REFRESH_TOKEN_VALIDITY_MS));
+        RefreshToken refreshToken;
+        if (existingTokenOpt.isPresent()) {
+            refreshToken = existingTokenOpt.get();
+            refreshToken.setToken(UUID.randomUUID().toString());
+            refreshToken.setExpiryDate(Instant.now().plusMillis(REFRESH_TOKEN_VALIDITY_MS));
+        } else {
+            refreshToken = new RefreshToken();
+            refreshToken.setUser(user);
+            refreshToken.setToken(UUID.randomUUID().toString());
+            refreshToken.setExpiryDate(Instant.now().plusMillis(REFRESH_TOKEN_VALIDITY_MS));
+        }
 
         return refreshTokenRepository.save(refreshToken);
     }
