@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -45,7 +46,7 @@ public class AuthService {
         user.setRole("ROLE_USER");
         userRepository.save(user);
 
-        UserDetails userDetails = org.springframework.security.core.userdetails.User
+        UserDetails userDetails = User
                 .withUsername(user.getEmail())
                 .password(user.getPassword())
                 .roles("USER")

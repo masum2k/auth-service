@@ -12,7 +12,6 @@ import javax.crypto.SecretKey;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.function.Function;
 
 @Service
 public class JwtService {
@@ -21,23 +20,9 @@ public class JwtService {
     private String SECRET_KEY;
 
     private static final long ACCESS_TOKEN_VALIDITY = 1000 * 60 * 15;
-    private static final long REFRESH_TOKEN_VALIDITY = 1000 * 60 * 60 * 24 * 7;
-
-    public String extractUsername(String token) {
-        return extractClaim(token, Claims::getSubject);
-    }
-
-    public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
-        final Claims claims = extractAllClaims(token);
-        return claimsResolver.apply(claims);
-    }
 
     public String generateToken(UserDetails userDetails) {
         return createToken(new HashMap<>(), userDetails.getUsername(), ACCESS_TOKEN_VALIDITY);
-    }
-
-    public String generateRefreshToken(UserDetails userDetails) {
-        return createToken(new HashMap<>(), userDetails.getUsername(), REFRESH_TOKEN_VALIDITY);
     }
 
     private String createToken(Map<String, Object> claims, String subject, long expirationTime) {
@@ -48,27 +33,6 @@ public class JwtService {
                 .expiration(new Date(System.currentTimeMillis() + expirationTime)) // Dinamik sonlanma tarihi
                 .signWith(getSignInKey(), Jwts.SIG.HS256)
                 .compact();
-    }
-
-    public boolean isTokenValid(String token, UserDetails userDetails) {
-        final String username = extractUsername(token);
-        return (username.equals(userDetails.getUsername())) && !isTokenExpired(token);
-    }
-
-    private boolean isTokenExpired(String token) {
-        return extractExpiration(token).before(new Date());
-    }
-
-    private Date extractExpiration(String token) {
-        return extractClaim(token, Claims::getExpiration);
-    }
-
-    private Claims extractAllClaims(String token) {
-        return Jwts.parser()
-                .verifyWith(getSignInKey())
-                .build()
-                .parseSignedClaims(token)
-                .getPayload();
     }
 
     private SecretKey getSignInKey() {
