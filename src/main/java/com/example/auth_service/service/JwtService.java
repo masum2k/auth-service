@@ -1,6 +1,5 @@
 package com.example.auth_service.service;
 
-import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
@@ -30,7 +29,7 @@ public class JwtService {
                 .claims(claims)
                 .subject(subject)
                 .issuedAt(new Date(System.currentTimeMillis()))
-                .expiration(new Date(System.currentTimeMillis() + expirationTime)) // Dinamik sonlanma tarihi
+                .expiration(new Date(System.currentTimeMillis() + expirationTime))
                 .signWith(getSignInKey(), Jwts.SIG.HS256)
                 .compact();
     }

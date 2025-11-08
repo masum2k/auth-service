@@ -4,18 +4,21 @@ import com.example.auth_service.model.RefreshToken;
 import com.example.auth_service.repository.RefreshTokenRepository;
 import com.example.auth_service.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 @Service
 @RequiredArgsConstructor
 public class RefreshTokenService {
 
-    private static final long REFRESH_TOKEN_VALIDITY_MS = 1000 * 60 * 60 * 24 * 7;
+    @Value("${jwt.refresh-token.expiration-days:7}")
+    private int refreshTokenExpirationDays;
 
     private final RefreshTokenRepository refreshTokenRepository;
     private final UserRepository userRepository;
@@ -25,19 +28,14 @@ public class RefreshTokenService {
         var user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
 
-        Optional<RefreshToken> existingTokenOpt = refreshTokenRepository.findByUser(user);
+        RefreshToken refreshToken = refreshTokenRepository.findByUser(user)
+                .orElse(new RefreshToken());
 
-        RefreshToken refreshToken;
-        if (existingTokenOpt.isPresent()) {
-            refreshToken = existingTokenOpt.get();
-            refreshToken.setToken(UUID.randomUUID().toString());
-            refreshToken.setExpiryDate(Instant.now().plusMillis(REFRESH_TOKEN_VALIDITY_MS));
-        } else {
-            refreshToken = new RefreshToken();
-            refreshToken.setUser(user);
-            refreshToken.setToken(UUID.randomUUID().toString());
-            refreshToken.setExpiryDate(Instant.now().plusMillis(REFRESH_TOKEN_VALIDITY_MS));
-        }
+        refreshToken.setUser(user);
+        refreshToken.setToken(UUID.randomUUID().toString());
+        refreshToken.setExpiryDate(Instant.now().plusMillis(
+                TimeUnit.DAYS.toMillis(refreshTokenExpirationDays)
+        ));
 
         return refreshTokenRepository.save(refreshToken);
     }
@@ -47,9 +45,9 @@ public class RefreshTokenService {
     }
 
     public RefreshToken verifyExpiration(RefreshToken token) {
-        if (token.getExpiryDate().compareTo(Instant.now()) < 0) {
+        if (token.getExpiryDate().isBefore(Instant.now())) {
             refreshTokenRepository.delete(token);
-            throw new RuntimeException("Refresh token was expired. Please make a new signin request.");
+            throw new RuntimeException("Refresh token expired. Please sign in again.");
         }
         return token;
     }

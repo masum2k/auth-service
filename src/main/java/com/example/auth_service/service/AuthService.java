@@ -10,6 +10,7 @@ import com.example.auth_service.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -26,92 +27,67 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
-
     private final RefreshTokenService refreshTokenService;
 
     @Transactional
     public AuthResponse register(RegisterRequest request) {
         if (userRepository.existsByEmail(request.email())) {
-            log.warn("REGISTER: Email {} zaten var.", request.email());
+            log.warn("Registration attempt with existing email: {}", request.email());
             throw new IllegalArgumentException("Email already in use");
         }
 
         AppUser user = new AppUser();
         user.setEmail(request.email());
-
-        String encodedPassword = passwordEncoder.encode(request.password());
-        log.info("REGISTER: '{}' için şifre hash'lendi: {}", request.email(), encodedPassword);
-
-        user.setPassword(encodedPassword);
+        user.setPassword(passwordEncoder.encode(request.password()));
         user.setRole("ROLE_USER");
         userRepository.save(user);
 
-        UserDetails userDetails = User
-                .withUsername(user.getEmail())
-                .password(user.getPassword())
-                .roles("USER")
-                .build();
-
+        UserDetails userDetails = buildUserDetails(user);
         String accessToken = jwtService.generateToken(userDetails);
-
         RefreshToken refreshToken = refreshTokenService.createRefreshToken(user.getEmail());
 
-        log.info("REGISTER: {} için kayıt BAŞARILI. Token üretildi.", request.email());
-
+        log.info("User registered successfully: {}", request.email());
         return new AuthResponse(accessToken, refreshToken.getToken());
     }
 
     @Transactional
     public AuthResponse login(LoginRequest request) {
-        log.info("LOGIN: {} için giriş denemesi.", request.email());
-
         try {
             authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(
-                            request.email(),
-                            request.password()
-                    )
+                    new UsernamePasswordAuthenticationToken(request.email(), request.password())
             );
-        } catch (Exception e) {
-            log.error("LOGIN: {} için kimlik doğrulama BAŞARISIZ: {}", request.email(), e.getMessage());
-            throw e;
+        } catch (BadCredentialsException e) {
+            log.warn("Failed login attempt for email: {}", request.email());
+            throw new IllegalArgumentException("Invalid email or password");
         }
 
-        log.info("LOGIN: {} için kimlik doğrulama BAŞARILI.", request.email());
+        AppUser user = userRepository.findByEmail(request.email())
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
-        var user = userRepository.findByEmail(request.email())
-                .orElseThrow(() -> new IllegalArgumentException("Invalid email or password"));
-
-        UserDetails userDetails = org.springframework.security.core.userdetails.User
-                .withUsername(user.getEmail())
-                .password(user.getPassword())
-                .roles(user.getRole().replace("ROLE_", ""))
-                .build();
-
+        UserDetails userDetails = buildUserDetails(user);
         String accessToken = jwtService.generateToken(userDetails);
-
         RefreshToken refreshToken = refreshTokenService.createRefreshToken(user.getEmail());
 
+        log.info("User logged in successfully: {}", request.email());
         return new AuthResponse(accessToken, refreshToken.getToken());
     }
 
     public AuthResponse refreshToken(RefreshTokenRequest request) {
-        String requestRefreshToken = request.refreshToken();
-
-        return refreshTokenService.findByToken(requestRefreshToken)
+        return refreshTokenService.findByToken(request.refreshToken())
                 .map(refreshTokenService::verifyExpiration)
                 .map(RefreshToken::getUser)
                 .map(user -> {
-                    UserDetails userDetails = org.springframework.security.core.userdetails.User
-                            .withUsername(user.getEmail())
-                            .password(user.getPassword())
-                            .roles(user.getRole().replace("ROLE_", ""))
-                            .build();
-
+                    UserDetails userDetails = buildUserDetails(user);
                     String newAccessToken = jwtService.generateToken(userDetails);
-
-                    return new AuthResponse(newAccessToken, requestRefreshToken);
+                    return new AuthResponse(newAccessToken, request.refreshToken());
                 })
                 .orElseThrow(() -> new RuntimeException("Refresh token is not in database or expired!"));
+    }
+
+    private UserDetails buildUserDetails(AppUser user) {
+        return User.withUsername(user.getEmail())
+                .password(user.getPassword())
+                .roles(user.getRole().replace("ROLE_", ""))
+                .build();
     }
 }
