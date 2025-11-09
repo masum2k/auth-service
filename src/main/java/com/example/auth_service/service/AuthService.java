@@ -6,17 +6,18 @@ import com.example.auth_service.dto.RefreshTokenRequest;
 import com.example.auth_service.dto.RegisterRequest;
 import com.example.auth_service.model.AppUser;
 import com.example.auth_service.model.RefreshToken;
+import com.example.auth_service.model.Role;
 import com.example.auth_service.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.userdetails.User;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Set;
 
 @Slf4j
 @Service
@@ -39,11 +40,10 @@ public class AuthService {
         AppUser user = new AppUser();
         user.setEmail(request.email());
         user.setPassword(passwordEncoder.encode(request.password()));
-        user.setRole("ROLE_USER");
+        user.setAuthorities(Set.of(Role.ROLE_USER));
         userRepository.save(user);
 
-        UserDetails userDetails = buildUserDetails(user);
-        String accessToken = jwtService.generateToken(userDetails);
+        String accessToken = jwtService.generateToken(user);
         RefreshToken refreshToken = refreshTokenService.createRefreshToken(user.getEmail());
 
         log.info("User registered successfully: {}", request.email());
@@ -64,8 +64,7 @@ public class AuthService {
         AppUser user = userRepository.findByEmail(request.email())
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
-        UserDetails userDetails = buildUserDetails(user);
-        String accessToken = jwtService.generateToken(userDetails);
+        String accessToken = jwtService.generateToken(user);
         RefreshToken refreshToken = refreshTokenService.createRefreshToken(user.getEmail());
 
         log.info("User logged in successfully: {}", request.email());
@@ -77,17 +76,9 @@ public class AuthService {
                 .map(refreshTokenService::verifyExpiration)
                 .map(RefreshToken::getUser)
                 .map(user -> {
-                    UserDetails userDetails = buildUserDetails(user);
-                    String newAccessToken = jwtService.generateToken(userDetails);
+                    String newAccessToken = jwtService.generateToken(user);
                     return new AuthResponse(newAccessToken, request.refreshToken());
                 })
                 .orElseThrow(() -> new RuntimeException("Refresh token is not in database or expired!"));
-    }
-
-    private UserDetails buildUserDetails(AppUser user) {
-        return User.withUsername(user.getEmail())
-                .password(user.getPassword())
-                .roles(user.getRole().replace("ROLE_", ""))
-                .build();
     }
 }
