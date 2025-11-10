@@ -16,26 +16,26 @@ import java.util.Map;
 public class JwtService {
 
     @Value("${jwt.secret}")
-    private String SECRET_KEY;
+    private String secret;
 
-    private static final long ACCESS_TOKEN_VALIDITY = 1000 * 60 * 15;
+    private static final long ACCESS_TOKEN_VALIDITY = 900000; //15 min
 
     public String generateToken(UserDetails userDetails) {
-        return createToken(new HashMap<>(), userDetails.getUsername(), ACCESS_TOKEN_VALIDITY);
+        return createToken(new HashMap<>(), userDetails.getUsername());
     }
 
-    private String createToken(Map<String, Object> claims, String subject, long expirationTime) {
+    private String createToken(Map<String, Object> claims, String subject) {
         return Jwts.builder()
                 .claims(claims)
                 .subject(subject)
                 .issuedAt(new Date(System.currentTimeMillis()))
-                .expiration(new Date(System.currentTimeMillis() + expirationTime))
+                .expiration(new Date(System.currentTimeMillis() + JwtService.ACCESS_TOKEN_VALIDITY))
                 .signWith(getSignInKey(), Jwts.SIG.HS256)
                 .compact();
     }
 
     private SecretKey getSignInKey() {
-        byte[] keyBytes = Decoders.BASE64.decode(SECRET_KEY);
+        byte[] keyBytes = Decoders.BASE64.decode(secret);
         return Keys.hmacShaKeyFor(keyBytes);
     }
 }
