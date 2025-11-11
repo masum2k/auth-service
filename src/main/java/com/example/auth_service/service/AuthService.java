@@ -4,6 +4,10 @@ import com.example.auth_service.dto.AuthResponse;
 import com.example.auth_service.dto.LoginRequest;
 import com.example.auth_service.dto.RefreshTokenRequest;
 import com.example.auth_service.dto.RegisterRequest;
+import com.example.auth_service.exception.EmailAlreadyExistsException;
+import com.example.auth_service.exception.InvalidCredentialsException;
+import com.example.auth_service.exception.TokenRefreshException;
+import com.example.auth_service.exception.UserNotFoundException;
 import com.example.auth_service.model.AppUser;
 import com.example.auth_service.model.RefreshToken;
 import com.example.auth_service.model.Role;
@@ -34,7 +38,7 @@ public class AuthService {
     public AuthResponse register(RegisterRequest request) {
         if (userRepository.existsByEmail(request.email())) {
             log.warn("Registration attempt with existing email: {}", request.email());
-            throw new IllegalArgumentException("Email already in use");
+            throw new EmailAlreadyExistsException("Email already in use: " + request.email());
         }
 
         AppUser user = new AppUser();
@@ -58,11 +62,11 @@ public class AuthService {
             );
         } catch (BadCredentialsException e) {
             log.warn("Failed login attempt for email: {}", request.email());
-            throw new IllegalArgumentException("Invalid email or password");
+            throw new InvalidCredentialsException("Invalid email or password");
         }
 
         AppUser user = userRepository.findByEmail(request.email())
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .orElseThrow(() -> new UserNotFoundException("User not found with email: " + request.email()));
 
         String accessToken = jwtService.generateToken(user);
         RefreshToken refreshToken = refreshTokenService.createRefreshToken(user.getEmail());
@@ -79,6 +83,6 @@ public class AuthService {
                     String newAccessToken = jwtService.generateToken(user);
                     return new AuthResponse(newAccessToken, request.refreshToken());
                 })
-                .orElseThrow(() -> new RuntimeException("Refresh token is not in database or expired!"));
+                .orElseThrow(() -> new TokenRefreshException("Refresh token is not in database or expired!"));
     }
 }

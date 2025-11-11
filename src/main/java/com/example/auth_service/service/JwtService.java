@@ -9,8 +9,6 @@ import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
 import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
 
 @Service
 public class JwtService {
@@ -21,12 +19,11 @@ public class JwtService {
     private static final long ACCESS_TOKEN_VALIDITY = 900000; //15 min
 
     public String generateToken(UserDetails userDetails) {
-        return createToken(new HashMap<>(), userDetails.getUsername());
+        return createToken(userDetails.getUsername());
     }
 
-    private String createToken(Map<String, Object> claims, String subject) {
+    private String createToken(String subject) {
         return Jwts.builder()
-                .claims(claims)
                 .subject(subject)
                 .issuedAt(new Date(System.currentTimeMillis()))
                 .expiration(new Date(System.currentTimeMillis() + JwtService.ACCESS_TOKEN_VALIDITY))

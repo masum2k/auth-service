@@ -1,5 +1,6 @@
 package com.example.auth_service.service;
 
+import com.example.auth_service.exception.TokenRefreshException;
 import com.example.auth_service.model.RefreshToken;
 import com.example.auth_service.repository.RefreshTokenRepository;
 import com.example.auth_service.repository.UserRepository;
@@ -17,7 +18,7 @@ import java.util.concurrent.TimeUnit;
 @RequiredArgsConstructor
 public class RefreshTokenService {
 
-    @Value("${jwt.refresh-token.expiration-days:7}")
+    @Value("${jwt.refresh-token.expiration-days}")
     private int refreshTokenExpirationDays;
 
     private final RefreshTokenRepository refreshTokenRepository;
@@ -47,7 +48,7 @@ public class RefreshTokenService {
     public RefreshToken verifyExpiration(RefreshToken token) {
         if (token.getExpiryDate().isBefore(Instant.now())) {
             refreshTokenRepository.delete(token);
-            throw new RuntimeException("Refresh token expired. Please sign in again.");
+            throw new TokenRefreshException("Refresh token expired. Please sign in again.");
         }
         return token;
     }
