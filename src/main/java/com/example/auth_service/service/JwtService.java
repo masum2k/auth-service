@@ -16,7 +16,8 @@ public class JwtService {
     @Value("${jwt.secret}")
     private String secret;
 
-    private static final long ACCESS_TOKEN_VALIDITY = 900000; //15 min
+    @Value("${jwt.access-token.validity-ms}")
+    private long accessTokenValidity;
 
     public String generateToken(UserDetails userDetails) {
         return createToken(userDetails.getUsername());
@@ -26,7 +27,7 @@ public class JwtService {
         return Jwts.builder()
                 .subject(subject)
                 .issuedAt(new Date(System.currentTimeMillis()))
-                .expiration(new Date(System.currentTimeMillis() + JwtService.ACCESS_TOKEN_VALIDITY))
+                .expiration(new Date(System.currentTimeMillis() + accessTokenValidity))
                 .signWith(getSignInKey(), Jwts.SIG.HS256)
                 .compact();
     }

@@ -26,7 +26,7 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(HttpStatus.UNAUTHORIZED, ex.getMessage());
     }
 
-    // 404 - User nor found
+    // 404 - User not found
     @ExceptionHandler(UserNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleUserNotFound(UserNotFoundException ex) {
         log.warn("User not found: {}", ex.getMessage());
