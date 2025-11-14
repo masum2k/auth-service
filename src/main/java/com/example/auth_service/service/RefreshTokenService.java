@@ -1,9 +1,9 @@
 package com.example.auth_service.service;
 
 import com.example.auth_service.exception.TokenRefreshException;
+import com.example.auth_service.model.AppUser;
 import com.example.auth_service.model.RefreshToken;
 import com.example.auth_service.repository.RefreshTokenRepository;
-import com.example.auth_service.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -22,13 +22,9 @@ public class RefreshTokenService {
     private int refreshTokenExpirationDays;
 
     private final RefreshTokenRepository refreshTokenRepository;
-    private final UserRepository userRepository;
 
     @Transactional
-    public RefreshToken createRefreshToken(String email) {
-        var user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
-
+    public RefreshToken createRefreshToken(AppUser user) {
         RefreshToken refreshToken = refreshTokenRepository.findByUser(user)
                 .orElse(new RefreshToken());
 

@@ -7,7 +7,6 @@ import com.example.auth_service.dto.RegisterRequest;
 import com.example.auth_service.exception.EmailAlreadyExistsException;
 import com.example.auth_service.exception.InvalidCredentialsException;
 import com.example.auth_service.exception.TokenRefreshException;
-import com.example.auth_service.exception.UserNotFoundException;
 import com.example.auth_service.model.AppUser;
 import com.example.auth_service.model.RefreshToken;
 import com.example.auth_service.model.Role;
@@ -17,6 +16,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -48,7 +48,8 @@ public class AuthService {
         userRepository.save(user);
 
         String accessToken = jwtService.generateToken(user);
-        RefreshToken refreshToken = refreshTokenService.createRefreshToken(user.getEmail());
+
+        RefreshToken refreshToken = refreshTokenService.createRefreshToken(user);
 
         log.info("User registered successfully: {}", request.email());
         return new AuthResponse(accessToken, refreshToken.getToken());
@@ -56,8 +57,9 @@ public class AuthService {
 
     @Transactional
     public AuthResponse login(LoginRequest request) {
+        Authentication authentication;
         try {
-            authenticationManager.authenticate(
+            authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(request.email(), request.password())
             );
         } catch (BadCredentialsException e) {
@@ -65,11 +67,11 @@ public class AuthService {
             throw new InvalidCredentialsException("Invalid email or password");
         }
 
-        AppUser user = userRepository.findByEmail(request.email())
-                .orElseThrow(() -> new UserNotFoundException("User not found with email: " + request.email()));
+        AppUser user = (AppUser) authentication.getPrincipal();
 
         String accessToken = jwtService.generateToken(user);
-        RefreshToken refreshToken = refreshTokenService.createRefreshToken(user.getEmail());
+
+        RefreshToken refreshToken = refreshTokenService.createRefreshToken(user);
 
         log.info("User logged in successfully: {}", request.email());
         return new AuthResponse(accessToken, refreshToken.getToken());
