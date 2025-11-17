@@ -3,18 +3,17 @@ FROM eclipse-temurin:21-jdk-jammy as builder
 
 WORKDIR /app
 
-# Maven wrapper dosyalarını kopyala
+# Sadece bağımlılık dosyalarını kopyala
 COPY mvnw .
 COPY .mvn .mvn
-
-# Projenin bağımlılıklarını kopyala ve indir
 COPY pom.xml .
-RUN ./mvnw dependency:go-offline
 
-# Tüm proje kaynak kodunu kopyala
+# Tüm kaynak kodu kopyala
 COPY src src
 
-# Projeyi build et (testleri atla)
+# 'go-offline' ADIMINI KALDIRDIK.
+# 'package' zaten gerekirse bağımlılıkları indirecek
+# ve testleri atlayacak.
 RUN ./mvnw clean package -Dmaven.test.skip=true
 
 # --- 2. Aşama: Run (Projenin son imajını oluşturma) ---
@@ -23,11 +22,10 @@ FROM eclipse-temurin:21-jre-jammy
 WORKDIR /app
 
 # Sadece 1. aşamada (builder) oluşturulan .jar dosyasını kopyala
-# NOT: pom.xml'deki <artifactId> 'auth-service' ise, target/*.jar da çalışır.
 COPY --from=builder /app/target/*.jar app.jar
 
-# Uygulamanın 8082 portunu açtığını belirt
-EXPOSE 8082
+# (EXPOSE portunu her servisin kendi portuyla değiştir,
+#  örn: api-gateway için 9000, auth-service için 8082 vb.)
+EXPOSE 9000
 
-# Konteyner başladığında çalıştırılacak komut
 ENTRYPOINT ["java", "-jar", "app.jar"]
